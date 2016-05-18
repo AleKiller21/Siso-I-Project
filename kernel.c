@@ -18,28 +18,34 @@
 #define ROWS            25
 
 
-void printText(char* word, int row, int column, char foreground_color);
-void clearScreen();
-void printDetails();
-void printIntroduction();
-void printHelloWorld();
-void setInfiniteLoop();
-void initKernel();
-int calculateAddress(int row, int column);
+void print_text(char* word, int row, int column, char foreground_color);
+void clear_screen();
+void print_details();
+void print_introduction();
+void print_hello_world();
+void set_infinite_loop();
+void init_kernel();
+int calculate_address(int row, int column);
 
-main()
+void handleInterrupt21 (int ax, int bx, int cx, int dx);
+
+int main()
 {
-    initKernel();
+    init_kernel();
 }
 
-void initKernel()
+void init_kernel()
 {
-    clearScreen();
-    printDetails();
-    setInfiniteLoop();
+    char buffer[80];
+
+    clear_screen();
+    syscall_setCursorPosition(0, 0);
+    makeInterrupt21();
+    callInterrupt21(1, buffer, 0, 0);
+    set_infinite_loop();
 }
 
-void clearScreen()
+void clear_screen()
 {
     int row, column;
 
@@ -47,12 +53,12 @@ void clearScreen()
     {
         for(column = 0; column < COLUMNS; column+= 1)
         {
-            putInMemory(0xB * 0x1000, calculateAddress(row+1, column+1) & 0x0ffff, 0x0);
+            putInMemory(0xB * 0x1000, calculate_address(row+1, column+1) & 0x0ffff, 0x0);
         }
     }
 }
 
-void setInfiniteLoop()
+void set_infinite_loop()
 {
     while(1)
     {
@@ -60,46 +66,46 @@ void setInfiniteLoop()
     }
 }
 
-void printDetails()
+void print_details()
 {
-    printIntroduction();
-    printHelloWorld();
+    print_introduction();
+    print_hello_world();
 }
 
-void printIntroduction()
+void print_introduction()
 {
-    printText("SISTEMAS OPERATIVOS I\0", 1, 27, 0x7);
-    printText("UNIVERSIDAD TECNOLOGICA CENTROAMERICANA (UNITEC)\0", 2, 13, 0x7);
-    printText("21351064 - Alejandro Ferrera", 3, 26, 0x7);
-    printText("MI PRIMER SISTEMA OPERATIVO", 4, 21, 0x7);
+    print_text("SISTEMAS OPERATIVOS I\0", 1, 27, 0x7);
+    print_text("UNIVERSIDAD TECNOLOGICA CENTROAMERICANA (UNITEC)\0", 2, 13, 0x7);
+    print_text("21351064 - Alejandro Ferrera", 3, 26, 0x7);
+    print_text("MI PRIMER SISTEMA OPERATIVO", 4, 21, 0x7);
 }
 
-void printHelloWorld()
+void print_hello_world()
 {
-    printText("--------------------------------------------------------------------------------\0", 5, 1, LIGHT_GRAY);
-    printText("******************************** Hola Mundo!************************************\0", 6, 1, BLUE);            /*Spanish*/
-    printText("******************************** Hello World!***********************************\0", 7, 1, GREEN);           /*English*/
-    printText("******************************** Kaixo Mundua!**********************************\0", 8, 1, CYAN);            /*Basque*/
-    printText("******************************** Moni Dziko Lapansi!****************************\0", 9, 1, MAGENTA);         /*Chichewa*/
-    printText("******************************** Bonghjornu Monde!******************************\0", 10, 1, BROWN);          /*Corsican*/
-    printText("******************************** Bok svijete!***********************************\0", 11, 1, LIGHT_GRAY);     /*Croatian*/
-    printText("******************************** Hej Verden!************************************\0", 12, 1, DARK_GRAY);      /*Danish*/
-    printText("******************************** Hallo Wereld!**********************************\0", 13, 1, LIGHT_BLUE);     /*Dutch*/
-    printText("******************************** Saluton mondo!*********************************\0", 14, 1, LIGHT_GREEN);    /*Esperanto*/
-    printText("******************************** Tere, Maailm!**********************************\0", 15, 1, LIGHT_CYAN);     /*Estonian*/
-    printText("******************************** Hei maailma!***********************************\0", 16, 1, LIGHT_RED);      /*Finnish*/
-    printText("******************************** Bonjour le monde!******************************\0", 17, 1, LIGHT_MAGENTA);  /*French*/
-    printText("******************************** Ola mundo!*************************************\0", 18, 1, YELLOW);         /*Galician*/
-    printText("******************************** Hallo Welt!************************************\0", 19, 1, WHITE);          /*German*/
-    printText("******************************** Alo Mondyal!***********************************\0", 20, 1, RED);            /*Haitian Creole*/
-    printText("******************************** Sannu Duniya!**********************************\0", 21, 1, MAGENTA);        /*Hausa*/
-    printText("******************************** Nyob zoo lub ntiaj teb no!*********************\0", 22, 1, GREEN);          /*Hmong*/
-    printText("******************************** Halo Dunia!************************************\0", 23, 1, BROWN);          /*Indonesian*/
-    printText("******************************** Ciao mondo!************************************\0", 24, 1, LIGHT_BLUE);     /*Italian*/
-    printText("******************************** Salve mundi!***********************************\0", 25, 1, LIGHT_RED);      /*Latin*/
+    print_text("--------------------------------------------------------------------------------\0", 5, 1, LIGHT_GRAY);
+    print_text("******************************** Hola Mundo!************************************\0", 6, 1, BLUE);            /*Spanish*/
+    print_text("******************************** Hello World!***********************************\0", 7, 1, 0x1F);           /*English*/
+    print_text("******************************** Kaixo Mundua!**********************************\0", 8, 1, CYAN);            /*Basque*/
+    print_text("******************************** Moni Dziko Lapansi!****************************\0", 9, 1, MAGENTA);         /*Chichewa*/
+    print_text("******************************** Bonghjornu Monde!******************************\0", 10, 1, BROWN);          /*Corsican*/
+    print_text("******************************** Bok svijete!***********************************\0", 11, 1, LIGHT_GRAY);     /*Croatian*/
+    print_text("******************************** Hej Verden!************************************\0", 12, 1, DARK_GRAY);      /*Danish*/
+    print_text("******************************** Hallo Wereld!**********************************\0", 13, 1, LIGHT_BLUE);     /*Dutch*/
+    print_text("******************************** Saluton mondo!*********************************\0", 14, 1, LIGHT_GREEN);    /*Esperanto*/
+    print_text("******************************** Tere, Maailm!**********************************\0", 15, 1, LIGHT_CYAN);     /*Estonian*/
+    print_text("******************************** Hei maailma!***********************************\0", 16, 1, LIGHT_RED);      /*Finnish*/
+    print_text("******************************** Bonjour le monde!******************************\0", 17, 1, LIGHT_MAGENTA);  /*French*/
+    print_text("******************************** Ola mundo!*************************************\0", 18, 1, YELLOW);         /*Galician*/
+    print_text("******************************** Hallo Welt!************************************\0", 19, 1, WHITE);          /*German*/
+    print_text("******************************** Alo Mondyal!***********************************\0", 20, 1, RED);            /*Haitian Creole*/
+    print_text("******************************** Sannu Duniya!**********************************\0", 21, 1, MAGENTA);        /*Hausa*/
+    print_text("******************************** Nyob zoo lub ntiaj teb no!*********************\0", 22, 1, GREEN);          /*Hmong*/
+    print_text("******************************** Halo Dunia!************************************\0", 23, 1, BROWN);          /*Indonesian*/
+    print_text("******************************** Ciao mondo!************************************\0", 24, 1, LIGHT_BLUE);     /*Italian*/
+    print_text("******************************** Salve mundi!***********************************\0", 25, 1, LIGHT_RED);      /*Latin*/
 }
 
-void printText(char* word, int row, int column, char foreground_color)
+void print_text(char* word, int row, int column, char foreground_color)
 {
     int index = 0;
 
@@ -108,13 +114,13 @@ void printText(char* word, int row, int column, char foreground_color)
         if(word[index] == '\0')
             break;
 
-        putInMemory(0xB * 0x1000, calculateAddress(row, column) & 0x0ffff, word[index]);
-        putInMemory(0xB * 0x1000, (calculateAddress(row, column) & 0x0ffff) + 1, foreground_color);
+        putInMemory(0xB * 0x1000, calculate_address(row, column) & 0x0ffff, word[index]);
+        putInMemory(0xB * 0x1000, (calculate_address(row, column) & 0x0ffff) + 1, foreground_color);
         index+= 1;
     }
 }
 
-int calculateAddress(int row, int column)
+int calculate_address(int row, int column)
 {
     int address;
     int base_address = 0xB8000;
@@ -125,4 +131,27 @@ int calculateAddress(int row, int column)
     address = address + base_address;
 
     return address;
+}
+
+void handleInterrupt21 (int ax, int bx, int cx, int dx)
+{
+    switch(ax)
+    {
+        case 0:
+            syscall_printString(bx);
+            break;
+
+        case 1:
+            syscall_printString("Enter a line: \0");
+            syscall_readString(bx);
+            syscall_printString(bx);
+            break;
+
+        case 2:
+            syscall_readSector(bx, cx);
+            break;
+
+        default:
+            syscall_printString("The value in AX is unrecognized!");
+    }
 }
