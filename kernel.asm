@@ -10,6 +10,7 @@
 	.global	_readSector
 	.global _callInterrupt21
 	.global _setCursorPosition
+	.global _launchProgram
 	.extern _handleInterrupt21
 
 ;void putInMemory (int segment, int address, char character)
@@ -140,6 +141,42 @@ _setCursorPosition:
 	int #0x10
 	pop bp
 	ret
+
+;void launchProgram(char* buffer, int segment)
+_launchProgram:
+	mov bp, sp
+	mov ax, [bp+4]	;put the segment into ax
+
+	;transfer file into bottom of segment
+	mov es, ax
+	mov si, [bp+2]
+	mov di, #0
+	mov cx, #13312
+	cld
+
+repeat:
+	cmp cx, #0
+	je body
+	movsb
+	dec cx
+	jmp repeat
+
+body:
+	mov si, #jump
+	mov [si+3], ax
+	;set up the segment registers
+	mov ds, ax
+	mov ss, ax
+	mov es, ax
+
+	;let's have the stack start at ax:fff0
+	mov ax, #0xfff0
+	mov sp, ax
+	mov bp, ax
+
+	;Switch to program
+jump:	jmp #0x0000:#0
+	;retf
 
 ;this is called when interrupt 21 happens
 ;it will call your function:

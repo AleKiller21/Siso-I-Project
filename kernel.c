@@ -19,11 +19,9 @@
 
 
 void print_text(char* word, int row, int column, char foreground_color);
-void clear_screen();
 void print_details();
 void print_introduction();
 void print_hello_world();
-void set_infinite_loop();
 void init_kernel();
 int calculate_address(int row, int column);
 
@@ -36,34 +34,14 @@ int main()
 
 void init_kernel()
 {
-    char buffer[80];
+    char buffer[13312];
 
-    clear_screen();
+    syscall_clearScreen();
     syscall_setCursorPosition(0, 0);
     makeInterrupt21();
-    callInterrupt21(1, buffer, 0, 0);
-    set_infinite_loop();
-}
-
-void clear_screen()
-{
-    int row, column;
-
-    for(row = 0; row < ROWS; row = row + 1)
-    {
-        for(column = 0; column < COLUMNS; column+= 1)
-        {
-            putInMemory(0xB * 0x1000, calculate_address(row+1, column+1) & 0x0ffff, 0x0);
-        }
-    }
-}
-
-void set_infinite_loop()
-{
-    while(1)
-    {
-
-    }
+    callInterrupt21(4, "tstpr2", 0x2000, 0);
+    /*syscall_executeProgram("tstprg", 0x2000);*/
+    while(1);
 }
 
 void print_details()
@@ -149,6 +127,19 @@ void handleInterrupt21 (int ax, int bx, int cx, int dx)
 
         case 2:
             syscall_readSector(bx, cx);
+            break;
+
+        case 3:
+            syscall_readFile(bx, cx);
+            syscall_printString(cx);
+            break;
+
+        case 4:
+            syscall_executeProgram(bx, cx);
+            break;
+
+        case 5:
+            syscall_terminate();
             break;
 
         default:
