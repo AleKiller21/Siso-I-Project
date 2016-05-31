@@ -7,6 +7,7 @@ void syscall_executeProgram(char* name, int segment);
 void syscall_terminate();
 void syscall_setCursorPosition(int row, int col);
 void syscall_clearScreen();
+int calculate_address(int row, int column);
 
 void syscall_printString(char* buffer)
 {
@@ -122,7 +123,7 @@ void syscall_terminate()
 
 void syscall_setCursorPosition(int row, int col)
 {
-    setCursorPosition(0, 0);
+    setCursorPosition(row, col);
 }
 
 void syscall_clearScreen()
@@ -133,7 +134,21 @@ void syscall_clearScreen()
     {
         for(column = 0; column < 80; column+= 1)
         {
-            putInMemory(0xB * 0x1000, calculate_address(row+1, column+1) & 0x0ffff, 0x0);
+            /*putInMemory(0xB * 0x1000, calculate_address(row+1, column+1) & 0x0ffff, 0x0);*/
+            printChar(0xa);
         }
     }
+}
+
+int calculate_address(int row, int column)
+{
+    int address;
+    int base_address = 0xB8000;
+
+    address = 80 * (row-1);
+    address = address + (column-1);
+    address = address * 2;
+    address = address + base_address;
+
+    return address;
 }
