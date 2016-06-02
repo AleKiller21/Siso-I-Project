@@ -11,6 +11,7 @@
 	.global _callInterrupt21
 	.global _setCursorPosition
 	.global _launchProgram
+	.global _terminates
 	.extern _handleInterrupt21
 
 ;void putInMemory (int segment, int address, char character)
@@ -177,6 +178,9 @@ body:
 	;Switch to program
 jump:	jmp #0x0000:#0
 	;retf
+
+_terminates:
+	retf
 
 ;this is called when interrupt 21 happens
 ;it will call your function:

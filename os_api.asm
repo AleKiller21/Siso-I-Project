@@ -2,101 +2,17 @@
 ;Michael Black, 2007
 
 ;kernel.asm contains assembly functions that you can use in your kernel
-	.global _putInMemory
-	.global _interrupt
-	.global _printChar
-	.global _readChar
-	.global	_readSector
 	.global _callInterrupt21
-	.global _setCursorPosition
+	.global _syscall_printString
+	.global _syscall_readString
+	;.global _syscall_readSector
+	.global _syscall_readFile
+	.global _syscall_executeProgram
+	.global _syscall_terminate
+	.global _syscall_clearScreen
+	.global _syscall_setCursorPosition
 	.global _launchProgram
 
-;void putInMemory (int segment, int address, char character)
-_putInMemory:
-	push bp
-	mov bp,sp
-	push ds
-	mov ax,[bp+4]
-	mov si,[bp+6]
-	mov cl,[bp+8]
-	mov ds,ax
-	mov [si],cl
-	pop ds
-	pop bp
-	ret
-
-;int interrupt (int number, int AX, int BX, int CX, int DX)
-_interrupt:
-	push bp
-	mov bp,sp
-	mov ax,[bp+4]	;get the interrupt number in AL
-	push ds		;use self-modifying code to call the right interrupt
-	mov bx,cs
-	mov ds,bx
-	mov si,#intr
-	mov [si+1],al	;change the 00 below to the contents of AL
-	pop ds
-	mov ax,[bp+6]	;get the other parameters AX, BX, CX, and DX
-	mov bx,[bp+8]
-	mov cx,[bp+10]
-	mov dx,[bp+12]
-
-intr:	int #0x00	;call the interrupt (00 will be changed above)
-
-	mov ah,#0	;we only want AL returned
-	pop bp
-	ret
-
-;void printChar(char ch)
-_printChar:
-	push bp
-	mov bp, sp
-	;mov bh, #0
-	mov ah, #0xE
-	mov al, [bp+4]
-	int #0x10
-	pop bp
-	ret
-
-;void readChar()
-_readChar:
-	push bp
-	mov bp, sp
-	mov ah, #0x0
-	int #0x16
-	pop bp
-	ret
-
-;void readSector(char* buffer, int sector)
-_readSector:
-	push bp
-	mov bp, sp
-	mov dx, #0
-	mov ax, [bp+6]
-	mov bx, #18
-	div bx
-	add dl, #1
-	mov cl, dl
-	mov dx, #0
-	mov ax, [bp+6]
-	mov bx, #36
-	div bx
-	mov ch, al
-	mov dx, #0
-	mov ax, [bp+6]
-	mov bx, #18
-	div bx
-	mov dx, #0
-	mov bx, #2
-	div bx
-	mov dh, dl
-	mov ah, #2
-	mov al, #1
-	mov bx, [bp+4]
-	mov dl, #0
-	int #0x13
-	pop bp
-	ret
 
 ;void callInterrupt21 (int AX, int BX, int CX, int DX)
 _callInterrupt21:
@@ -110,15 +26,148 @@ _callInterrupt21:
 	pop bp
 	ret
 
-;vois setCursorPosition (int row, int col)
-_setCursorPosition:
+;void printString(char *buffer);
+_syscall_printString:
 	push bp
 	mov bp, sp
-	mov bh, #0
-	mov dh, [bp+4]
-	mov dl, [bp+6]
-	mov ah, #2
-	int #0x10
+	mov dx, #0
+	mov cx, #0
+	mov bx, [bp+4]
+	mov ax, #0
+	;push #0
+	;push #0
+	;push bx
+	;push #0
+	;call _callInterrupt21
+	int #0x21
+	;pop ax
+	;pop bx
+	;pop cx
+	;pop dx
+	pop bp
+	ret
+
+;void readString(char* buffer)
+_syscall_readString:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov cx, #0
+	mov bx, [bp+4]
+	mov ax, #1
+	;push #0
+	;push #0
+	;push bx
+	;push #1
+	;call _callInterrupt21
+	int #0x21
+	;pop ax
+	;pop bx
+	;pop cx
+	;pop dx
+	pop bp
+	ret
+
+;void readFile(char* file, char* buffer)
+_syscall_readFile:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov cx, [bp+6]
+	mov bx, [bp+4]
+	mov ax, #2
+	;push #0
+	;push cx
+	;push bx
+	;push #2
+	;call _callInterrupt21
+	int #0x21
+	;pop ax
+	;pop bx
+	;pop cx
+	;pop dx
+	pop bp
+	ret
+
+;void executeProgram(char* name, int segment)
+_syscall_executeProgram:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov cx, [bp+6]
+	mov bx, [bp+4]
+	mov ax, #3
+	;push #0
+	;push cx
+	;push bx
+	;push #3
+	;call _callInterrupt21
+	int #0x21
+	;pop ax
+	;pop bx
+	;pop cx
+	;pop dx
+	pop bp
+	ret
+
+_syscall_terminate:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov cx, #0
+	mov bx, #0
+	mov ax, #4
+	;push #0
+	;push cx
+	;push bx
+	;push #3
+	;call _callInterrupt21
+	int #0x21
+	;pop ax
+	;pop bx
+	;pop cx
+	;pop dx
+	pop bp
+	ret
+
+_syscall_clearScreen:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov cx, #0
+	mov bx, #0
+	mov ax, #5
+	;push #0
+	;push cx
+	;push bx
+	;push #3
+	;call _callInterrupt21
+	int #0x21
+	;pop ax
+	;pop bx
+	;pop cx
+	;pop dx
+	pop bp
+	ret
+
+;vois setCursorPosition (int row, int col)
+_syscall_setCursorPosition:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov cx, [bp+6]
+	mov bx, [bp+4]
+	mov ax, #6
+	;push #0
+	;push cx
+	;push bx
+	;push #6
+	;call _callInterrupt21
+	int #0x21
+	;pop ax
+	;pop bx
+	;pop cx
+	;pop dx
 	pop bp
 	ret
 
@@ -157,7 +206,3 @@ body:
 	;Switch to program
 jump:	jmp #0x0000:#0
 	;retf
-
-
-;------------------------------------------------------------------------MY FUNCTIONS---------------------------------------------------------------
-
