@@ -8,10 +8,12 @@
 	.global _printChar
 	.global _readChar
 	.global	_readSector
+	.global _writeSector
 	.global _callInterrupt21
 	.global _setCursorPosition
 	.global _launchProgram
 	.global _terminates
+	.global _clearScreens
 	.extern _handleInterrupt21
 
 ;void putInMemory (int segment, int address, char character)
@@ -73,6 +75,7 @@ _printChar:
 	push bp
 	mov bp, sp
 	;mov bh, #0
+	mov bl, #0x2
 	mov ah, #0xE
 	mov al, [bp+4]
 	int #0x10
@@ -112,6 +115,37 @@ _readSector:
 	div bx
 	mov dh, dl
 	mov ah, #2
+	mov al, #1
+	mov bx, [bp+4]
+	mov dl, #0
+	int #0x13
+	pop bp
+	ret
+	
+;void writeSector(char* buffer, int sector_number);
+_writeSector:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov ax, [bp+6]
+	mov bx, #18
+	div bx
+	add dl, #1
+	mov cl, dl
+	mov dx, #0
+	mov ax, [bp+6]
+	mov bx, #36
+	div bx
+	mov ch, al
+	mov dx, #0
+	mov ax, [bp+6]
+	mov bx, #18
+	div bx
+	mov dx, #0
+	mov bx, #2
+	div bx
+	mov dh, dl
+	mov ah, #3
 	mov al, #1
 	mov bx, [bp+4]
 	mov dl, #0
@@ -181,6 +215,17 @@ jump:	jmp #0x0000:#0
 
 _terminates:
 	retf
+
+_clearScreens:
+	mov ah, #6
+	mov al, #0
+	mov bh, #7
+	mov ch, #0
+	mov cl, #0
+	mov dh, #25
+	mov dl, #80
+	int #0x10
+	ret
 
 ;this is called when interrupt 21 happens
 ;it will call your function:

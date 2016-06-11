@@ -7,6 +7,9 @@
 .global _syscall_terminate
 .global _syscall_setCursorPosition
 .global _syscall_list_files
+.global _syscall_writeSector
+.global _syscall_delete
+.global _syscall_writeFile
 
 ;void printString(char *buffer);
 _syscall_printString:
@@ -20,12 +23,12 @@ _syscall_printString:
 	pop bp
 	ret
 
-;void readString(char* buffer)
+;void readString(char* buffer, int os_name_length)
 _syscall_readString:
 	push bp
 	mov bp, sp
 	mov dx, #0
-	mov cx, #0
+	mov cx, [bp+6]
 	mov bx, [bp+4]
 	mov ax, #1
 	int #0x21
@@ -76,7 +79,7 @@ _syscall_terminate:
 _syscall_setCursorPosition:
 	push bp
 	mov bp, sp
-	mov ax, #6
+	mov ax, #9
 	mov bx, [bp+4]
 	mov cx, [bp+6]
 	mov dx, #0
@@ -91,7 +94,43 @@ _syscall_list_files:
 	mov dx, #0
 	mov cx, #0
 	mov bx, [bp+4]
+	mov ax, #10
+	int #0x21
+	pop bp
+	ret
+
+;void writeSector(char* buffer, int sector_number);
+_syscall_writeSector:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov cx, [bp+6]
+	mov bx, [bp+4]
+	mov ax, #6
+	int #0x21
+	pop bp
+	ret
+
+;void delete_file(char* buffer);
+_syscall_delete:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov cx, #0
+	mov bx, [bp+4]
 	mov ax, #7
+	int #0x21
+	pop bp
+	ret
+
+;void write_file(char* name, char* buffer, int size);
+_syscall_writeFile:
+	push bp
+	mov bp, sp
+	mov dx, [bp+8]
+	mov cx, [bp+6]
+	mov bx, [bp+4]
+	mov ax, #8
 	int #0x21
 	pop bp
 	ret
