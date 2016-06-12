@@ -15,13 +15,6 @@ int get_size_as_sectors(char* name);
 int write_file(char* name, char* buffer, int size);
 int readFile(char* file, char* buffer);
 
-int search_file(char* file, char* buffer);
-int search_directory_entry(char* directory, char* name);
-int search_map_sector(char* map);
-void clear_buffer(char* buffer, int size);
-void mem_copy(char* origin, char* destiny, int bytes);
-void set_name_directory_entry(char* directory, char* name);
-
 int main()
 {
     makeInterrupt21();
@@ -254,52 +247,15 @@ int write_file(char* name, char* file, int size)
 
     if(entry == -1) return -1;
 
-    for(i_sector = 0; i_sector < 6; i_sector += 1)
-    {
-        if(name[i_sector] == '\0') break;
+    set_name_directory_entry(directory, name, entry);
 
-        directory[entry + i_sector] = name[i_sector];
-    }
+    if(search_free_sectors(sectors, map, free_sectors) == -1) return -1;
 
-    for(; i_sector < 6; i_sector += 1)
-        directory[entry + i_sector] = 0x00;
-
-    for(i_map = 0; i_map < sectors; i_map += 1)
-    {
-        sector = search_map_sector(map);
-
-        if(sector == -1) return -1;
-
-        map[sector] = 0xFF;
-
-        free_sectors[i_map] = sector;
-    }
-
-    i_map = 0;
-
-    for(i_buffer = 0; i_buffer < size; i_buffer += 512)
-    {
-        /*if(file[i_buffer] == '\0' || file[i_buffer] == 0x00) break;*/
-        
-        directory[entry + i_sector] = free_sectors[i_map];
-        mem_copy(file + i_buffer, buffer, SECTOR_SIZE);
-        writeSector(buffer, free_sectors[i_map]);
-        clear_buffer(buffer, SECTOR_SIZE);
-
-        i_sector += 1;
-        i_map += 1;
-    }
-
-    for(; i_sector < 32; i_sector += 1)
-        directory[entry + i_sector] = 0x00;
-
+    write_file_to_disk(directory, free_sectors, file, buffer, entry, size);
     writeSector(map, 1);
     writeSector(directory, 2);
-}
 
-void set_name_directory_entry(char* directory, char* name)
-{
-    int i_sector = 0;
+    return 1;
 }
 
 int readFile(char* file, char* buffer)
@@ -327,84 +283,4 @@ int readFile(char* file, char* buffer)
 
     return 1;
 }
-
-int search_file(char* file, char* buffer)
-{
-    if(readFile(file, buffer) == 1)
-    {
-        return 1;
-    }
-
-    return -1;
-}
-
-int search_directory_entry(char* directory, char* name)
-{
-    int entry;
-    int i_name;
-
-    int found = 0;
-
-    for(entry = 0; entry < 512; entry += 32)
-    {
-        for(i_name = 0; i_name < 6; i_name += 1)
-        {
-            if(name == 0x00 && directory[entry] == 0x00)
-            {
-                found = 1;
-                break;
-            }
-
-            if(name == 0x00) break;
-
-            if(directory[entry + i_name] != name[i_name]) break;
-
-            if((i_name == 5 && name[i_name + 1] == '\0') || directory[i_name + 1] == 0x00)
-            {
-                found = 1;
-                break;
-            }
-        }
-
-        if(found == 1) return entry;
-    }
-
-    return -1;
-}
-
-int search_map_sector(char* map)
-{
-    int sector;
-
-    for(sector = 0; sector < 512; sector += 1)
-    {
-        if(map[sector] == 0x00)
-            return sector;
-    }
-
-    return -1;
-}
-
-void clear_buffer(char* buffer, int size)
-{
-    int i;
-
-    for(i = 0; i < size; i+= 1)
-    {
-        buffer[i] = '\0';
-    }
-}
-
-void mem_copy(char* origin, char* destiny, int bytes)
-{
-    int i;
-
-    for(i = 0; i < bytes; i += 1)
-    {
-        /*if(origin[i] == 0x40) break;*/
-        destiny[i] = origin[i];
-    }
-}
-
-
 

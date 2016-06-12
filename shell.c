@@ -1,5 +1,5 @@
 
-#define COMMANDS 			8
+#define COMMANDS 			9
 #define FILE_NAME_SIZE 		6
 #define COMMAND_LENGTH 		7
 #define OS_NAME_LENGTH		7
@@ -21,13 +21,7 @@ void help(int letter_offset, char* input, char** commands);
 void version(int letter_offset, char* input);
 void delete(int letter_offset, char* input);
 void copy(int letter_offset, char* input);
-
-void clear_buffer(char* buffer, int size);
-
-int validate_file_name(char* input, , int letter_offset);
-int validate_command(char* input, , int letter_offset);
-int get_file_size(char* file);
-void parse_name_copy_command(char* input, int* iterator, char delimiter, char* buffer);
+void create(int letter_offset, char* input);
 
 int cursor_y;
 char commands[COMMANDS][COMMAND_LENGTH];
@@ -135,6 +129,9 @@ void run_command(char* input, int cmd_sel, int letter_offset)
 		case 7:
 			copy(letter_offset, input);
 			break;
+
+		case 8:
+			create(letter_offset, input);
 	}
 }
 
@@ -148,6 +145,7 @@ void set_valid_commands(char** commands)
 	commands[5] = "fairy -v\0";
 	commands[6] = "delete\0";
 	commands[7] = "copy\0";
+	commands[8] = "create\0";
 }
 
 void clear_screen(int letter_offset, char* input)
@@ -310,60 +308,12 @@ void copy(int letter_offset, char* input)
 	syscall_writeFile(file_name_destiny, buffer, file_size);
 }
 
-void clear_buffer(char* buffer, int size)
+void create(int letter_offset, char* input)
 {
-	int i;
+	letter_offset += 1;
 
-	for(i = 0; i < size; i += 1)
-	{
-		buffer[i] = '\0';
-	}
-}
+	if(validate_file_name(input, letter_offset) == 1) return;
 
-int validate_file_name(char* input, int letter_offset)
-{
-	if(*(input + (letter_offset - 1)) == '\0' || *(input + letter_offset) == '\0' || *(input + letter_offset) == 0x20)
-	{
-		syscall_printString(" --> Wrong input of name");
-
-		return 1;
-	}
-
-	return 0;
-}
-
-int validate_command(char* input, int letter_offset)
-{
-	if(input[letter_offset] != '\0')
-	{
-		syscall_printString(" --> Command invalid\0");
-		return 1;
-	}
-
-	return 0;
-}
-
-int get_file_size(char* file)
-{
-	int i;
-
-	for(i = 0; i < PROGRAM_SIZE; i += 1)
-	{
-		if(file[i] =='\0') break;
-	}
-
-	return i;
-}
-
-void parse_name_copy_command(char* input, int* iterator, char delimiter, char* buffer)
-{
-	int i = 0;
-
-	while(input[*iterator] != delimiter)
-	{
-		buffer[i] = input[*iterator];
-		i += 1;
-		(*iterator) += 1;
-	}
+	
 }
 
