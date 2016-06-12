@@ -10,6 +10,7 @@
 .global _syscall_writeSector
 .global _syscall_delete
 .global _syscall_writeFile
+.global _syscall_get_size_as_sectors
 
 ;void printString(char *buffer);
 _syscall_printString:
@@ -134,3 +135,16 @@ _syscall_writeFile:
 	int #0x21
 	pop bp
 	ret
+
+;void get_size_as_sectors(char* name);
+_syscall_get_size_as_sectors:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov cx, #0
+	mov bx, [bp+4]
+	mov ax, #11
+	int #0x21
+	pop bp
+	ret
+

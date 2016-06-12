@@ -211,7 +211,6 @@ body:
 
 	;Switch to program
 jump:	jmp #0x0000:#0
-	;retf
 
 _terminates:
 	retf
@@ -236,7 +235,9 @@ _interrupt21ServiceRoutine:
 	push bx
 	push ax
 	call _handleInterrupt21
+	mov bx, ax
 	pop ax
+	mov ax, bx
 	pop bx
 	pop cx
 	pop dx

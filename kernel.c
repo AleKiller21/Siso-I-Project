@@ -1,21 +1,26 @@
 
 #define PROGRAM_SIZE    13312
 #define SECTOR_SIZE     512
+#define MAX_SECTORS     26
 
 
 void handleInterrupt21 (int ax, int bx, int cx, int dx);
+
 void printString(char *buffer);
 void readString(char *buffer, int os_name_length);
-void executeProgram(char* name, int segment);
-void clear_buffer(char* buffer, int size);
 void list_files(char* buffer);
-void delete_file(char* name);
-void write_file(char* name, char* buffer, int size);
-
-/*int calculate_address(int row, int column);*/
-int search_file(char* file, char* buffer);
-int search(char* directory, char* name);
+int executeProgram(char* name, int segment);
+int delete_file(char* name);
+int get_size_as_sectors(char* name);
+int write_file(char* name, char* buffer, int size);
 int readFile(char* file, char* buffer);
+
+int search_file(char* file, char* buffer);
+int search_directory_entry(char* directory, char* name);
+int search_map_sector(char* map);
+void clear_buffer(char* buffer, int size);
+void mem_copy(char* origin, char* destiny, int bytes);
+void set_name_directory_entry(char* directory, char* name);
 
 int main()
 {
@@ -41,8 +46,7 @@ void handleInterrupt21 (int ax, int bx, int cx, int dx)
             break;
 
         case 3:
-            executeProgram(bx, cx);
-            break;
+            return executeProgram(bx, cx);
 
         case 4:
             clearScreens();
@@ -57,12 +61,10 @@ void handleInterrupt21 (int ax, int bx, int cx, int dx)
             break;
 
         case 7:
-            delete_file(bx);
-            break;
+            return delete_file(bx);
 
         case 8:
-            write_file(bx, cx, dx);
-            break;
+            return write_file(bx, cx, dx);
 
         case 9:
             setCursorPosition(bx, cx);
@@ -71,6 +73,9 @@ void handleInterrupt21 (int ax, int bx, int cx, int dx)
         case 10:
             list_files(bx);
             break;
+
+        case 11:
+            return get_size_as_sectors(bx);
     }
 }
 
@@ -124,28 +129,6 @@ void readString(char* buffer, int os_name_length)
     }
 }
 
-void executeProgram(char* name, int segment)
-{
-    char buffer[PROGRAM_SIZE];
-
-    clear_buffer(buffer, PROGRAM_SIZE);
-
-    if(search_file(name, buffer) == 0)
-    {
-        launchProgram(buffer, segment);
-    }
-}
-
-void clear_buffer(char* buffer, int size)
-{
-    int i;
-
-    for(i = 0; i < size; i+= 1)
-    {
-        buffer[i] = '\0';
-    }
-}
-
 void list_files(char* buffer)
 {
     char directory[SECTOR_SIZE];
@@ -168,7 +151,23 @@ void list_files(char* buffer)
     }
 }
 
-void delete_file(char* name)
+int executeProgram(char* name, int segment)
+{
+    char buffer[PROGRAM_SIZE];
+
+    clear_buffer(buffer, PROGRAM_SIZE);
+
+    if(search_file(name, buffer) == 1)
+    {
+        launchProgram(buffer, segment);
+        return 1;
+    }
+
+    else
+        return -1;
+}
+
+int delete_file(char* name)
 {
     char map[SECTOR_SIZE];
     char directory[SECTOR_SIZE];
@@ -176,55 +175,157 @@ void delete_file(char* name)
     int i_name;
     int i_sector;
 
-    int found = 0;
-    int delete = 0;
-
     readSector(map, 1);
     readSector(directory, 2);
 
-    for(entry = 0; entry < 512; entry += 32)
+    entry = search_directory_entry(directory, name);
+
+    if(entry == -1) return -1;
+
+    directory[entry] = 0x0;
+
+    for(i_sector = 6; i_sector < 32; i_sector += 1)
     {
-        if(delete == 1) break;
+        int sector = directory[entry + i_sector];
 
-        for(i_name = 0; i_name < 6; i_name += 1)
+        if(sector == 0x0)
         {
-            if(directory[entry + i_name] != name[i_name]) break;
-
-            if(i_name == 5 || directory[i_name + 1] == 0x0)
-            {
-                directory[entry] = 0x0;
-                found = 1;
-                break;
-            }
+            break;
         }
 
-        if(found == 0) continue;
-
-        for(i_sector = 6; i_sector < 32; i_sector += 1)
-        {
-            int sector = directory[entry + i_sector];
-
-            if(sector == 0x0)
-            {
-                delete = 1;
-                break;
-            }
-
-            map[sector] = 0x0;
-        }
+        map[sector] = 0x0;
     }
+
+    writeSector(map, 1);
+    writeSector(directory, 2);
+
+    return 0;
+}
+
+int get_size_as_sectors(char* name)
+{
+    char directory[SECTOR_SIZE];
+    int entry;
+    int counter;
+    int i_sector;
+
+    readSector(directory, 2);
+    counter = 0;
+
+    entry = search_directory_entry(directory, name);
+
+    if(entry == -1) return -1;
+
+    for(i_sector = 6; i_sector < 32; i_sector += 1)
+    {
+        if(directory[entry + i_sector] == 0x00) break;
+
+        counter += 1;
+    }
+
+    return counter;
+}
+
+int write_file(char* name, char* file, int size)
+{
+    char map[SECTOR_SIZE];
+    char directory[SECTOR_SIZE];
+    char buffer[SECTOR_SIZE];
+    char free_sectors[MAX_SECTORS];
+    int i_sector;
+    int i_buffer;
+    int i_map;
+    int entry;
+    int sector;
+
+    int sectors = size / SECTOR_SIZE;
+
+    if(size % SECTOR_SIZE != 0)
+    {
+        sectors += 1;
+    }
+
+    readSector(map, 1);
+    readSector(directory, 2);
+    clear_buffer(buffer, SECTOR_SIZE);
+    clear_buffer(free_sectors, MAX_SECTORS);
+
+    entry = search_directory_entry(directory, 0x00);
+
+    if(entry == -1) return -1;
+
+    for(i_sector = 0; i_sector < 6; i_sector += 1)
+    {
+        if(name[i_sector] == '\0') break;
+
+        directory[entry + i_sector] = name[i_sector];
+    }
+
+    for(; i_sector < 6; i_sector += 1)
+        directory[entry + i_sector] = 0x00;
+
+    for(i_map = 0; i_map < sectors; i_map += 1)
+    {
+        sector = search_map_sector(map);
+
+        if(sector == -1) return -1;
+
+        map[sector] = 0xFF;
+
+        free_sectors[i_map] = sector;
+    }
+
+    i_map = 0;
+
+    for(i_buffer = 0; i_buffer < size; i_buffer += 512)
+    {
+        /*if(file[i_buffer] == '\0' || file[i_buffer] == 0x00) break;*/
+        
+        directory[entry + i_sector] = free_sectors[i_map];
+        mem_copy(file + i_buffer, buffer, SECTOR_SIZE);
+        writeSector(buffer, free_sectors[i_map]);
+        clear_buffer(buffer, SECTOR_SIZE);
+
+        i_sector += 1;
+        i_map += 1;
+    }
+
+    for(; i_sector < 32; i_sector += 1)
+        directory[entry + i_sector] = 0x00;
 
     writeSector(map, 1);
     writeSector(directory, 2);
 }
 
-void write_file(char* name, char* buffer, int size)
+void set_name_directory_entry(char* directory, char* name)
 {
-    char map[SECTOR_SIZE];
-    char directory[SECTOR_SIZE];
+    int i_sector = 0;
+}
 
-    readSector(map, 1);
+int readFile(char* file, char* buffer)
+{
+    char directory[SECTOR_SIZE];
+    int entry;
+    int i_sector;
+
     readSector(directory, 2);
+
+    entry = search_directory_entry(directory, file);
+
+    if(entry == -1) return -1;
+
+    for(i_sector = 6; i_sector < 32; i_sector += 1)
+    {
+        if(directory[i_sector + entry] == 0x0)
+        {
+            return 1;
+        }
+
+        readSector(buffer, directory[i_sector + entry]);
+        buffer += SECTOR_SIZE;
+    }
+
+    return 1;
 }
 
 int search_file(char* file, char* buffer)
@@ -234,20 +335,31 @@ int search_file(char* file, char* buffer)
         return 1;
     }
 
-    return 0;
+    return -1;
 }
 
-int search(char* directory, char* name)
+int search_directory_entry(char* directory, char* name)
 {
+    int entry;
+    int i_name;
+
     int found = 0;
 
     for(entry = 0; entry < 512; entry += 32)
     {
         for(i_name = 0; i_name < 6; i_name += 1)
         {
+            if(name == 0x00 && directory[entry] == 0x00)
+            {
+                found = 1;
+                break;
+            }
+
+            if(name == 0x00) break;
+
             if(directory[entry + i_name] != name[i_name]) break;
 
-            if(i_name == 5 || directory[i_name + 1] == 0x0)
+            if((i_name == 5 && name[i_name + 1] == '\0') || directory[i_name + 1] == 0x00)
             {
                 found = 1;
                 break;
@@ -257,54 +369,42 @@ int search(char* directory, char* name)
         if(found == 1) return entry;
     }
 
-    return 0x0;
+    return -1;
 }
 
-int readFile(char* file, char* buffer)
+int search_map_sector(char* map)
 {
-    char directory[SECTOR_SIZE];
-    int entry;
-    int i_name;
-    int i_sector;
+    int sector;
 
-    int found = 1;
-
-    readSector(directory, 2);
-
-    for(entry = 0; entry < SECTOR_SIZE; entry += 32)
+    for(sector = 0; sector < 512; sector += 1)
     {
-        for(i_name = 0; i_name  < 6; i_name += 1)
-        {
-            if(directory[i_name + entry] != file[i_name])
-            {
-                found = 1;
-                break;
-            }
-
-            if(i_name == 5 && file[i_name + 1] == '\0')
-                found = 0;            
-        }
-
-        if(found == 1)
-            continue;
-
-        for(i_sector = 6; i_sector < 32; i_sector += 1)
-        {
-            if(directory[i_sector + entry] == 0)
-            {
-                return 0;
-            }
-
-            readSector(buffer, directory[i_sector + entry]);
-            buffer += SECTOR_SIZE;
-        }
-
-        if(found == 0)
-        {
-            return 0;
-        }
+        if(map[sector] == 0x00)
+            return sector;
     }
 
-    return 1;
+    return -1;
 }
+
+void clear_buffer(char* buffer, int size)
+{
+    int i;
+
+    for(i = 0; i < size; i+= 1)
+    {
+        buffer[i] = '\0';
+    }
+}
+
+void mem_copy(char* origin, char* destiny, int bytes)
+{
+    int i;
+
+    for(i = 0; i < bytes; i += 1)
+    {
+        /*if(origin[i] == 0x40) break;*/
+        destiny[i] = origin[i];
+    }
+}
+
+
 

@@ -1,7 +1,7 @@
 
-#define COMMANDS 			7
+#define COMMANDS 			8
 #define FILE_NAME_SIZE 		6
-#define COMMAND_LENGTH 		6
+#define COMMAND_LENGTH 		7
 #define OS_NAME_LENGTH		7
 #define ENTRIES_DIR			16 
 #define BUFFER_SIZE 		80
@@ -20,11 +20,14 @@ void list_files(int letter_offset, char* input);
 void help(int letter_offset, char* input, char** commands);
 void version(int letter_offset, char* input);
 void delete(int letter_offset, char* input);
+void copy(int letter_offset, char* input);
 
 void clear_buffer(char* buffer, int size);
 
 int validate_file_name(char* input, , int letter_offset);
 int validate_command(char* input, , int letter_offset);
+int get_file_size(char* file);
+void parse_name_copy_command(char* input, int* iterator, char delimiter, char* buffer);
 
 int cursor_y;
 char commands[COMMANDS][COMMAND_LENGTH];
@@ -128,6 +131,10 @@ void run_command(char* input, int cmd_sel, int letter_offset)
 		case 6:
 			delete(letter_offset, input);
 			break;
+
+		case 7:
+			copy(letter_offset, input);
+			break;
 	}
 }
 
@@ -140,6 +147,7 @@ void set_valid_commands(char** commands)
 	commands[4] = "help\0";
 	commands[5] = "fairy -v\0";
 	commands[6] = "delete\0";
+	commands[7] = "copy\0";
 }
 
 void clear_screen(int letter_offset, char* input)
@@ -165,9 +173,8 @@ void type_file(int letter_offset, char* input)
 	clear_buffer(buffer, PROGRAM_SIZE);
 
 	syscall_setCursorPosition(cursor_y, 0);
-	syscall_readFile(input + letter_offset, buffer);
 
-	if(buffer[0] == '\0')
+	if(syscall_readFile(input + letter_offset, buffer) == -1)
 	{
 		syscall_printString("No such file exists!\0");
 		return;
@@ -184,7 +191,10 @@ void exec_program(int letter_offset, char* input)
 	if(validate_file_name(input, letter_offset) == 1) return;
 
 	syscall_setCursorPosition(cursor_y, 0);
-	syscall_executeProgram(input + letter_offset, 0x2000);
+	if(syscall_executeProgram(input + letter_offset, 0x2000) == -1)
+	{
+		syscall_printString("Program not found!");
+	}
 }
 
 void list_files(int letter_offset, char* input)
@@ -256,12 +266,48 @@ void version(int letter_offset, char* input)
 void delete(int letter_offset, char* input)
 {
 	letter_offset += 1;
-	cursor_y += 2;
 
 	if(validate_file_name(input, letter_offset) == 1) return;
 
-	syscall_setCursorPosition(cursor_y, 0);
-	syscall_delete(input + letter_offset);
+	if(syscall_delete(input + letter_offset) == -1)
+	{
+		cursor_y += 1;
+		syscall_setCursorPosition(cursor_y, 0);
+		syscall_printString("File not found!");
+	}
+}
+
+void copy(int letter_offset, char* input)
+{
+	char file_name_origin[FILE_NAME_SIZE + 1];
+	char file_name_destiny[FILE_NAME_SIZE + 1];
+	char buffer[PROGRAM_SIZE];
+	int file_size;
+
+	clear_buffer(file_name_origin, FILE_NAME_SIZE + 1);
+	clear_buffer(file_name_destiny, FILE_NAME_SIZE + 1);
+	clear_buffer(buffer, PROGRAM_SIZE);
+
+	letter_offset += 1;
+
+	if(validate_file_name(input, letter_offset) == 1) return;
+
+	parse_name_copy_command(input, &letter_offset, 0x20, file_name_origin);
+	letter_offset += 1;
+	parse_name_copy_command(input, &letter_offset, '\0', file_name_destiny);
+
+	if(syscall_readFile(file_name_origin, buffer) == -1)
+	{
+		cursor_y += 1;
+		syscall_setCursorPosition(cursor_y, 0);
+		syscall_printString("No such file exists!\0");
+		return;
+	}
+
+	file_size = syscall_get_size_as_sectors(file_name_origin);
+
+	file_size *= 512;
+	syscall_writeFile(file_name_destiny, buffer, file_size);
 }
 
 void clear_buffer(char* buffer, int size)
@@ -296,3 +342,28 @@ int validate_command(char* input, int letter_offset)
 
 	return 0;
 }
+
+int get_file_size(char* file)
+{
+	int i;
+
+	for(i = 0; i < PROGRAM_SIZE; i += 1)
+	{
+		if(file[i] =='\0') break;
+	}
+
+	return i;
+}
+
+void parse_name_copy_command(char* input, int* iterator, char delimiter, char* buffer)
+{
+	int i = 0;
+
+	while(input[*iterator] != delimiter)
+	{
+		buffer[i] = input[*iterator];
+		i += 1;
+		(*iterator) += 1;
+	}
+}
+
