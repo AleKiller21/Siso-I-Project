@@ -199,8 +199,10 @@ void list_files(int letter_offset, char* input)
 {
 	int i;
 	int i_letter;
+	int i_digits;
+	int sectors;
 	int size = ENTRIES_DIR * FILE_NAME_SIZE;
-	int sizes[ENTRIES_DIR];
+	int digits[5];
 	char buffer[ENTRIES_DIR][FILE_NAME_SIZE];
 	char names[ENTRIES_DIR * FILE_NAME_SIZE];
 
@@ -211,6 +213,7 @@ void list_files(int letter_offset, char* input)
 		clear_buffer(buffer[i], FILE_NAME_SIZE);
 	}
 
+	clear_digits_buffer(digits, 5);
 	clear_buffer(names, size);
 
 	if(validate_command(input, letter_offset) == 1) return;
@@ -228,11 +231,19 @@ void list_files(int letter_offset, char* input)
 			iterator += 1;
 		}
 
+		sectors = syscall_get_size_as_sectors(buffer[i]);
+		get_size_from_sectors(sectors, digits);
+
 		cursor_y += 1;
 
 		syscall_setCursorPosition(cursor_y, 0);
 		syscall_printString("- ");
 		syscall_printString(buffer[i]);
+		syscall_printString(" - ");
+		print_numbers(digits, 5);
+
+		syscall_printString(" bytes\0");
+		clear_digits_buffer(digits, 5);
 	}
 }
 
