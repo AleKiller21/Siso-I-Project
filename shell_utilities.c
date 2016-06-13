@@ -11,7 +11,7 @@
 int validate_file_name(char* input, , int letter_offset);
 int validate_command(char* input, , int letter_offset);
 int get_file_size(char* file);
-void parse_name_copy_command(char* input, int* iterator, char delimiter, char* buffer);
+int parse_name_copy_command(char* input, int* iterator, char delimiter, char* buffer);
 void clear_buffer(char* buffer, int size);
 
 void clear_buffer(char* buffer, int size)
@@ -59,14 +59,25 @@ int get_file_size(char* file)
 	return i;
 }
 
-void parse_name_copy_command(char* input, int* iterator, char delimiter, char* buffer)
+int parse_name_copy_command(char* input, int* iterator, char delimiter, char* buffer)
 {
 	int i = 0;
 
-	while(input[*iterator] != delimiter)
+	/*while(input[*iterator] != delimiter)
 	{
 		buffer[i] = input[*iterator];
 		i += 1;
 		(*iterator) += 1;
+	}*/
+
+	for(; *iterator < INPUT_SIZE; *iterator += 1)
+	{
+		if(input[*iterator] == delimiter) return 1;
+		if(input[*iterator] == '\0') return -1;
+
+		buffer[i] = input[*iterator];
+		i += 1;
 	}
+
+	return -1;
 }

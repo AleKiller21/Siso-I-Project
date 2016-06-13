@@ -21,7 +21,7 @@ void help(int letter_offset, char* input, char** commands);
 void version(int letter_offset, char* input);
 void delete(int letter_offset, char* input);
 void copy(int letter_offset, char* input);
-void create(int letter_offset, char* input);
+void open_spell(int letter_offset, char* input);
 
 int cursor_y;
 char commands[COMMANDS][COMMAND_LENGTH];
@@ -131,7 +131,7 @@ void run_command(char* input, int cmd_sel, int letter_offset)
 			break;
 
 		case 8:
-			create(letter_offset, input);
+			open_spell(letter_offset, input);
 	}
 }
 
@@ -145,7 +145,7 @@ void set_valid_commands(char** commands)
 	commands[5] = "fairy -v\0";
 	commands[6] = "delete\0";
 	commands[7] = "copy\0";
-	commands[8] = "create\0";
+	commands[8] = "spell\0";
 }
 
 void clear_screen(int letter_offset, char* input)
@@ -200,6 +200,7 @@ void list_files(int letter_offset, char* input)
 	int i;
 	int i_letter;
 	int size = ENTRIES_DIR * FILE_NAME_SIZE;
+	int sizes[ENTRIES_DIR];
 	char buffer[ENTRIES_DIR][FILE_NAME_SIZE];
 	char names[ENTRIES_DIR * FILE_NAME_SIZE];
 
@@ -290,7 +291,16 @@ void copy(int letter_offset, char* input)
 
 	if(validate_file_name(input, letter_offset) == 1) return;
 
-	parse_name_copy_command(input, &letter_offset, 0x20, file_name_origin);
+	/*parse_name_copy_command(input, &letter_offset, 0x20, file_name_origin);*/
+
+	if(parse_name_copy_command(input, &letter_offset, 0x20, file_name_origin) == -1)
+	{
+		cursor_y += 1;
+		syscall_setCursorPosition(cursor_y, 0);
+		syscall_printString("Wrong input of command!\0");
+		return;
+	}
+
 	letter_offset += 1;
 	parse_name_copy_command(input, &letter_offset, '\0', file_name_destiny);
 
@@ -308,12 +318,19 @@ void copy(int letter_offset, char* input)
 	syscall_writeFile(file_name_destiny, buffer, file_size);
 }
 
-void create(int letter_offset, char* input)
+void open_spell(int letter_offset, char* input)
 {
-	letter_offset += 1;
+	if(*(input + letter_offset) != '\0')
+	{
+		cursor_y += 1;
+		syscall_setCursorPosition(cursor_y, 0);
+		syscall_printString("Wrong input! Did you mean 'spell' ?\0");
+		return;
+	}
 
-	if(validate_file_name(input, letter_offset) == 1) return;
-
-	
+	if(syscall_executeProgram("spell\0", 0x2000) == -1)
+	{
+		syscall_printString("Program not found!");
+	}
 }
 
