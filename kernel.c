@@ -4,6 +4,7 @@
 #define MAX_SECTORS     26
 
 
+void handleTimerInterrupt();
 void handleInterrupt21 (int ax, int bx, int cx, int dx);
 
 void printString(char *buffer);
@@ -15,11 +16,28 @@ int get_size_as_sectors(char* name);
 int write_file(char* name, char* buffer, int size);
 int readFile(char* file, char* buffer);
 
+int counter;
+
 int main()
 {
+    counter = 0;
+
     makeInterrupt21();
+    irqInstallHandler(0x8);
+    setTimerPhase(100);
     executeProgram("shell\0", 0x2000);
     while(1);
+}
+
+void handleTimerInterrupt()
+{
+    counter += 1;
+
+    if(counter == 100)
+    {
+        printString("Tic\0");
+        counter = 0;
+    }
 }
 
 void handleInterrupt21 (int ax, int bx, int cx, int dx)

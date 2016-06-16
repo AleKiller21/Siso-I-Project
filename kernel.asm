@@ -3,7 +3,6 @@
 
 ;kernel.asm contains assembly functions that you can use in your kernel
 	.global _putInMemory
-	.global _interrupt
 	.global _makeInterrupt21
 	.global _printChar
 	.global _readChar
@@ -14,7 +13,13 @@
 	.global _launchProgram
 	.global _terminates
 	.global _clearScreens
+	.global _setKernelDataSegment
+	.global _restoreDataSegment
+	.global _irqInstallHandler
+	.global _timerISR
+	.global _setTimerPhase
 	.extern _handleInterrupt21
+	.extern _handleTimerInterrupt
 
 ;void putInMemory (int segment, int address, char character)
 _putInMemory:
@@ -27,28 +32,6 @@ _putInMemory:
 	mov ds,ax
 	mov [si],cl
 	pop ds
-	pop bp
-	ret
-
-;int interrupt (int number, int AX, int BX, int CX, int DX)
-_interrupt:
-	push bp
-	mov bp,sp
-	mov ax,[bp+4]	;get the interrupt number in AL
-	push ds		;use self-modifying code to call the right interrupt
-	mov bx,cs
-	mov ds,bx
-	mov si,#intr
-	mov [si+1],al	;change the 00 below to the contents of AL
-	pop ds
-	mov ax,[bp+6]	;get the other parameters AX, BX, CX, and DX
-	mov bx,[bp+8]
-	mov cx,[bp+10]
-	mov dx,[bp+12]
-
-intr:	int #0x00	;call the interrupt (00 will be changed above)
-
-	mov ah,#0	;we only want AL returned
 	pop bp
 	ret
 
@@ -224,6 +207,111 @@ _clearScreens:
 	mov dh, #25
 	mov dl, #80
 	int #0x10
+	ret
+
+;void setKernelDataSegment()
+;sets the data segment to the kernel, saving the current ds on the stack
+_setKernelDataSegment:
+    pop bx
+    push ds
+    push bx
+    mov ax,#0x1000
+    mov ds,ax
+    ret
+
+;void restoreDataSegment()
+;restores the data segment
+_restoreDataSegment:
+    pop bx
+    pop ds
+    push bx
+    ret
+
+; void irqInstallHandler(int irq_number, void (*fn)())
+; Install an IRQ handler
+_irqInstallHandler:
+	cli
+
+	push bp
+	mov bp, sp
+	push si 
+	push ds
+
+	;mov dx, [bp+6] 				;Function pointer
+	mov dx, #_timerISR
+	xor ax, ax 
+	mov ds, ax 					;Interrupt vector is at lowest memory
+	mov si, [bp+4]
+	shl si, 2					;ax = irq_handler * 4
+
+	mov ax, cs
+	mov [si + 2], ax
+	mov [si], dx
+
+	pop ds
+	pop si
+	pop bp
+
+	sti
+	ret
+
+;void timerISR()
+_timerISR:
+	cli
+
+	push bx
+	push cx
+	push dx
+	push si
+	push di
+	push bp
+	push ax
+	push ds
+	push es
+
+	mov al, #0x20
+	out #0x20, al
+
+	mov ax, #0x1000
+	mov ds, ax
+
+	call _handleTimerInterrupt
+
+	pop es
+	pop ds
+	pop ax
+	pop bp
+	pop di
+	pop si
+	pop dx
+	pop cx
+	pop bx
+
+	iret
+
+; void setTimerPhase(int hz) 
+;Set the timer frequency in Hertz
+_setTimerPhase:
+	push bp
+	mov bp, sp
+	mov dx, #0x0012 			;Default frequency of the timer is 1,193,180 Hz
+	mov ax, #0x34DC
+	mov bx, [bp+4]
+	div bx
+
+	mov bx, ax 					;Save quotient
+
+	mov dx, #0x43 
+	mov	al, #0x36
+	out dx, al					;Set our command byte 0x36
+
+	mov dx, #0x40
+	mov al, bl
+	out dx, al 					;Set low byte of divisor 
+	mov al, bh 
+	out	dx, al					;Set high byte of divisor
+
+	pop bp
 	ret
 
 ;this is called when interrupt 21 happens

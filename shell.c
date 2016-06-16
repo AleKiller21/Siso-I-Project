@@ -302,8 +302,6 @@ void copy(int letter_offset, char* input)
 
 	if(validate_file_name(input, letter_offset) == 1) return;
 
-	/*parse_name_copy_command(input, &letter_offset, 0x20, file_name_origin);*/
-
 	if(parse_name_copy_command(input, &letter_offset, 0x20, file_name_origin) == -1)
 	{
 		cursor_y += 1;
