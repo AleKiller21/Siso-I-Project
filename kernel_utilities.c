@@ -2,6 +2,7 @@
 #define PROGRAM_SIZE    13312
 #define SECTOR_SIZE     512
 #define MAX_SECTORS     26
+#define PROCESS_ENTRIES 8
 
 int search_file(char* file, char* buffer);
 int search_directory_entry(char* directory, char* name);

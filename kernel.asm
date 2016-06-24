@@ -12,6 +12,7 @@
 	.global _setCursorPosition
 	.global _launchProgram
 	.global _terminates
+	.global _copyToSegment
 	.global _clearScreens
 	.global _setKernelDataSegment
 	.global _restoreDataSegment
@@ -164,22 +165,16 @@ _setCursorPosition:
 _launchProgram:
 	mov bp, sp
 	mov ax, [bp+4]	;put the segment into ax
+	;mov bx, [bp+2]
 
 	;transfer file into bottom of segment
-	mov es, ax
-	mov si, [bp+2]
-	mov di, #0
-	mov cx, #13312
-	cld
+	;push ax
+	;push bx
+	;call _copyToSegment
+	;pop bx
+	;pop ax
 
-repeat:
-	cmp cx, #0
-	je body
-	movsb
-	dec cx
-	jmp repeat
 
-body:
 	mov si, #jump
 	mov [si+3], ax
 	;set up the segment registers
@@ -188,7 +183,8 @@ body:
 	mov es, ax
 
 	;let's have the stack start at ax:fff0
-	mov ax, #0xfff0
+	;mov ax, #0xfff0
+	mov ax, #0xff00
 	mov sp, ax
 	mov bp, ax
 
@@ -197,6 +193,30 @@ jump:	jmp #0x0000:#0
 
 _terminates:
 	retf
+
+;void copyToSegment(char* buffer, int segment)
+_copyToSegment:
+	push bp
+	mov bp, sp
+	mov ax, [bp+6]	;put the segment into ax
+
+	;transfer file into bottom of segment
+	mov es, ax
+	mov si, [bp+4]
+	mov di, #0
+	mov cx, #13312
+	cld
+
+repeat:
+	cmp cx, #0
+	je epilogue
+	movsb
+	dec cx
+	jmp repeat
+
+epilogue:
+	pop bp
+	ret
 
 _clearScreens:
 	mov ah, #6
@@ -257,8 +277,10 @@ _irqInstallHandler:
 
 ;void timerISR()
 _timerISR:
+	;disable interrupts
 	cli
 
+	;save all regs for the old process on the old process's stack
 	push bx
 	push cx
 	push dx
@@ -269,14 +291,23 @@ _timerISR:
 	push ds
 	push es
 
+	;reset interrupt controller so it performs more interrupts
 	mov al, #0x20
 	out #0x20, al
 
+	;switch to kernel data segment
 	mov ax, #0x1000
 	mov ds, ax
 
+	push sp
 	call _handleTimerInterrupt
+	pop sp
 
+	mov si, ax
+	mov ss, [si+4]
+	mov sp, [si+2]
+
+	;reload context
 	pop es
 	pop ds
 	pop ax

@@ -48,12 +48,12 @@ _syscall_readFile:
 	pop bp
 	ret
 
-;void executeProgram(char* name, int segment)
+;void executeProgram(char* name)
 _syscall_executeProgram:
 	push bp
 	mov bp, sp
 	mov dx, #0
-	mov cx, [bp+6]
+	mov cx, #0
 	mov bx, [bp+4]
 	mov ax, #3
 	int #0x21

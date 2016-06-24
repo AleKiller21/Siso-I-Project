@@ -189,7 +189,7 @@ void exec_program(int letter_offset, char* input)
 	if(validate_file_name(input, letter_offset) == 1) return;
 
 	syscall_setCursorPosition(cursor_y, 0);
-	if(syscall_executeProgram(input + letter_offset, 0x2000) == -1)
+	if(syscall_executeProgram(input + letter_offset) == -1)
 	{
 		syscall_printString("Program not found!");
 	}
@@ -337,7 +337,7 @@ void open_spell(int letter_offset, char* input)
 		return;
 	}
 
-	if(syscall_executeProgram("spell\0", 0x2000) == -1)
+	if(syscall_executeProgram("spell\0") == -1)
 	{
 		syscall_printString("Program not found!");
 	}

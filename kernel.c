@@ -2,41 +2,167 @@
 #define PROGRAM_SIZE    13312
 #define SECTOR_SIZE     512
 #define MAX_SECTORS     26
+#define PROCESS_ENTRIES 8
+#define PROCESS_READY   1
+#define PROCESS_WAITING 2
+#define PROCESS_RUNNING 3
+#define PROCESS_DEAD    4
 
 
-void handleTimerInterrupt();
+void initialize_process_queue();
+void initialize_program(int segment);
+void terminate_process();
+int schedule_process();
+
+struct process_found* handleTimerInterrupt(int sp);
 void handleInterrupt21 (int ax, int bx, int cx, int dx);
 
 void printString(char *buffer);
 void readString(char *buffer, int os_name_length);
 void list_files(char* buffer);
-int executeProgram(char* name, int segment);
+int executeProgram(char* name);
 int delete_file(char* name);
 int get_size_as_sectors(char* name);
 int write_file(char* name, char* buffer, int size);
 int readFile(char* file, char* buffer);
 
+struct PCB
+{
+    unsigned int status;
+    unsigned int sp;
+    unsigned int segment;
+    struct PCB* waiter;
+};
+
+struct Regs {
+    unsigned int es;
+    unsigned int ds;
+    unsigned int ax;
+    unsigned int bp;
+    unsigned int di;
+    unsigned int si;
+    unsigned int dx;
+    unsigned int cx;
+    unsigned int bx;
+    unsigned int ip;
+    unsigned int cs;
+    unsigned int flags;
+};
+
+struct process_found
+{
+    int process_available;
+    unsigned int sp;
+    unsigned int segment;
+};
+
 int counter;
+int i_current_process;
+struct PCB process_queue[PROCESS_ENTRIES];
+struct PCB* current_process;
+struct process_found process;
 
 int main()
 {
     counter = 0;
+    i_current_process = 0;
 
     makeInterrupt21();
+    initialize_process_queue();
+    executeProgram("shell\0");
     irqInstallHandler(0x8);
     setTimerPhase(100);
-    executeProgram("shell\0", 0x2000);
     while(1);
 }
 
-void handleTimerInterrupt()
+void initialize_process_queue()
+{
+    int i;
+
+    int segment = 0x2000;
+    /*current_process = 0;*/
+
+    for(i = 0; i < PROCESS_ENTRIES; i += 1)
+    {
+        process_queue[i].status = PROCESS_DEAD;
+        process_queue[i].sp = 0xff00;
+        process_queue[i].segment = segment;
+        process_queue[i].waiter = 0;
+
+        segment += 0x1000;
+    }
+}
+
+void initialize_program(int segment)
+{
+    struct Regs context;
+
+    context.es = segment;
+    context.ds = segment;
+    context.ax = 0;
+    context.bp = 0;
+    context.di = 0;
+    context.si = 0;
+    context.dx = 0;
+    context.cx = 0;
+    context.bx = 0;
+    context.ip = 0;
+    context.cs = segment;
+    context.flags = 0x0200;
+
+    /*copyToSegment(&context, (segment * 0x10) + 0xff00);*/
+    copyToSegment(&context, ((segment * 0x10) + 0xff00) - 0x18); /*Save at the top of the stack*/
+    /*copyToSegment(&context, segment);*/
+}
+
+void terminate_process()
+{
+    setKernelDataSegment();
+    current_process->status = PROCESS_DEAD;
+    restoreDataSegment();
+    while(1);
+}
+
+struct process_found* handleTimerInterrupt(int sp)
 {
     counter += 1;
+    current_process->sp = sp;
+    /*printString("Tic\0");*/
 
-    if(counter == 100)
-    {
-        printString("Tic\0");
+    if(counter == 1000)
+    {        
         counter = 0;
+    }
+
+    schedule_process();
+
+    process.process_available = 1;
+    process.sp = current_process->sp;
+    process.segment = current_process->segment;
+
+    return &process;
+}
+
+int schedule_process()
+{
+    int i;
+
+    for(i = i_current_process + 1; i < PROCESS_ENTRIES + 1; i += 1)
+    {
+        if(i == 8)
+        {
+            i = -1;
+            continue;
+        }
+
+        if(process_queue[i].status != PROCESS_READY) continue;
+
+        current_process->status = PROCESS_READY;
+        process_queue[i].status = PROCESS_RUNNING;
+        current_process = &process_queue[i];
+        i_current_process = i;
+
+        return 1;
     }
 }
 
@@ -57,14 +183,14 @@ void handleInterrupt21 (int ax, int bx, int cx, int dx)
             break;
 
         case 3:
-            return executeProgram(bx, cx);
+            return executeProgram(bx);
 
         case 4:
             clearScreens();
             break;
 
         case 5:
-            terminates();
+            terminate_process();
             break;
 
         case 6:
@@ -162,20 +288,45 @@ void list_files(char* buffer)
     }
 }
 
-int executeProgram(char* name, int segment)
+int executeProgram(char* name)
 {
     char buffer[PROGRAM_SIZE];
+    struct PCB running_process;
+    int i;
+
+    int free_segment = 0;
 
     clear_buffer(buffer, PROGRAM_SIZE);
 
-    if(search_file(name, buffer) == 1)
+    if(search_file(name, buffer) == -1) return -1;
+
+    setKernelDataSegment();
+
+    for(i = 0; i < PROCESS_ENTRIES; i += 1)
     {
-        launchProgram(buffer, segment);
-        return 1;
+        if(process_queue[i].status == PROCESS_DEAD) free_segment = 1;
+
+        if(free_segment != 1) continue;
+
+        process_queue[i].status = PROCESS_READY;
+        running_process = process_queue[i];
+        current_process = &process_queue[i];
+        i_current_process = i;
+        
+        break;
     }
 
-    else
-        return -1;
+    restoreDataSegment();
+
+    if(free_segment == 0) return;
+
+    copyToSegment(buffer, running_process.segment);
+    initialize_program(running_process.segment);
+    
+    if(process_queue[0].status == 1)
+        /*launchProgram(buffer, running_process.segment);*/
+    
+    return 1;
 }
 
 int delete_file(char* name)
