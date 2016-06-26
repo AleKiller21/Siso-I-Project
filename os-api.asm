@@ -11,6 +11,9 @@
 .global _syscall_delete
 .global _syscall_writeFile
 .global _syscall_get_size_as_sectors
+.global _syscall_kill_process
+.global _syscall_execute_blocking
+.global _enableInterrupts
 
 ;void printString(char *buffer);
 _syscall_printString:
@@ -146,5 +149,33 @@ _syscall_get_size_as_sectors:
 	mov ax, #11
 	int #0x21
 	pop bp
+	ret
+
+;void kill_process(int process_id)
+_syscall_kill_process:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov cx, #0
+	mov bx, [bp+4]
+	mov ax, #12
+	int #0x21
+	pop bp
+	ret
+
+;void executeProgram(char* name)
+_syscall_execute_blocking:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov cx, #0
+	mov bx, [bp+4]
+	mov ax, #13
+	int #0x21
+	pop bp
+	ret
+
+_enableInterrupts:
+	sti
 	ret
 

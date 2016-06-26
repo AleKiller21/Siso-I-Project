@@ -19,6 +19,8 @@
 	.global _irqInstallHandler
 	.global _timerISR
 	.global _setTimerPhase
+	.global _enableInterrupts
+	.global _printhex
 	.extern _handleInterrupt21
 	.extern _handleTimerInterrupt
 
@@ -79,6 +81,9 @@ _readChar:
 _readSector:
 	push bp
 	mov bp, sp
+	;mov ax, sp
+	;call _printhex
+
 	mov dx, #0
 	mov ax, [bp+6]
 	mov bx, #18
@@ -194,7 +199,7 @@ jump:	jmp #0x0000:#0
 _terminates:
 	retf
 
-;void copyToSegment(char* buffer, int segment)
+;void copyToSegment(char* buffer, int segment, int offset, int size)
 _copyToSegment:
 	push bp
 	mov bp, sp
@@ -203,8 +208,8 @@ _copyToSegment:
 	;transfer file into bottom of segment
 	mov es, ax
 	mov si, [bp+4]
-	mov di, #0
-	mov cx, #13312
+	mov di, [bp+8]
+	mov cx, [bp+10]		;#13312
 	cld
 
 repeat:
@@ -212,6 +217,8 @@ repeat:
 	je epilogue
 	movsb
 	dec cx
+	;mov ax, [si]
+	;call _printhex
 	jmp repeat
 
 epilogue:
@@ -301,11 +308,14 @@ _timerISR:
 
 	push sp
 	call _handleTimerInterrupt
-	pop sp
+	add sp, #2
 
 	mov si, ax
 	mov ss, [si+4]
 	mov sp, [si+2]
+
+	;mov ax, sp
+	;call _printhex
 
 	;reload context
 	pop es
@@ -317,6 +327,9 @@ _timerISR:
 	pop dx
 	pop cx
 	pop bx
+
+	;mov ax, sp
+	;call _printhex
 
 	iret
 
@@ -344,6 +357,62 @@ _setTimerPhase:
 
 	pop bp
 	ret
+
+_enableInterrupts:
+	sti
+	ret
+
+;printhex is used for debugging only
+;it prints out the contents of ax in hexadecimal
+_printhex:
+        push bx
+        push ax
+        push ax
+        push ax
+        push ax
+        mov al,ah
+        mov ah,#0xe
+        mov bx,#7
+        shr al,#4
+        and al,#0xf
+        cmp al,#0xa
+        jb ph1
+        add al,#0x7
+ph1:    add al,#0x30
+        int 0x10
+
+        pop ax
+        mov al,ah
+        mov ah,#0xe
+        and al,#0xf
+        cmp al,#0xa
+        jb ph2
+        add al,#0x7
+ph2:    add al,#0x30
+        int 0x10
+
+        pop ax
+        mov ah,#0xe
+        shr al,#4
+        and al,#0xf
+        cmp al,#0xa
+        jb ph3
+        add al,#0x7
+ph3:    add al,#0x30
+        int 0x10
+
+        pop ax
+        mov ah,#0xe
+        and al,#0xf
+        cmp al,#0xa
+        jb ph4
+        add al,#0x7
+ph4:    add al,#0x30
+        int 0x10
+
+        pop ax
+        pop bx
+        ret
 
 ;this is called when interrupt 21 happens
 ;it will call your function:

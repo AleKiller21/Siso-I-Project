@@ -12,6 +12,9 @@
 void initialize_process_queue();
 void initialize_program(int segment);
 void terminate_process();
+void kill_process(int process_id);
+void activate_waiting_process();
+void execute_w(char* name);
 int schedule_process();
 
 struct process_found* handleTimerInterrupt(int sp);
@@ -58,6 +61,7 @@ struct process_found
 
 int counter;
 int i_current_process;
+int new_process_entry;
 struct PCB process_queue[PROCESS_ENTRIES];
 struct PCB* current_process;
 struct process_found process;
@@ -65,13 +69,14 @@ struct process_found process;
 int main()
 {
     counter = 0;
-    i_current_process = 0;
+    i_current_process = -1;
 
     makeInterrupt21();
     initialize_process_queue();
     executeProgram("shell\0");
     irqInstallHandler(0x8);
     setTimerPhase(100);
+    /*executeProgram("shell\0");*/
     while(1);
 }
 
@@ -80,7 +85,7 @@ void initialize_process_queue()
     int i;
 
     int segment = 0x2000;
-    /*current_process = 0;*/
+    current_process = 0;
 
     for(i = 0; i < PROCESS_ENTRIES; i += 1)
     {
@@ -110,8 +115,8 @@ void initialize_program(int segment)
     context.cs = segment;
     context.flags = 0x0200;
 
-    /*copyToSegment(&context, (segment * 0x10) + 0xff00);*/
-    copyToSegment(&context, ((segment * 0x10) + 0xff00) - 0x18); /*Save at the top of the stack*/
+    copyToSegment(&context, segment, 0xff00, 24);
+    /*copyToSegment(&context, ((segment * 0x10) + 0xff00) - 0x18); /*Save at the top of the stack*/
     /*copyToSegment(&context, segment);*/
 }
 
@@ -119,14 +124,62 @@ void terminate_process()
 {
     setKernelDataSegment();
     current_process->status = PROCESS_DEAD;
+    activate_waiting_process();
     restoreDataSegment();
+    enableInterrupts();
     while(1);
+}
+
+void kill_process(int process_id)
+{
+    setKernelDataSegment();
+    
+    if(process_queue[process_id - 1].status == PROCESS_DEAD)
+    {
+        printString("That process is already dead \0");
+        return;
+    }
+    
+    process_queue[process_id - 1].status = PROCESS_DEAD;
+    activate_waiting_process();
+
+    restoreDataSegment();
+    /*enableInterrupts();*/
+    /*while(1); printChar('Z');*/
+}
+
+void activate_waiting_process()
+{
+    int i;
+
+    for(i = 0; i < PROCESS_ENTRIES; i += 1)
+    {
+        if(process_queue[i].waiter != current_process) continue;
+
+        process_queue[i].waiter = 0;
+        process_queue[i].status = PROCESS_READY;
+        /*printChar(process_queue[i].status + 48);*/
+        break;
+    }
+}
+
+void execute_w(char* name)
+{
+    executeProgram(name);
+
+    setKernelDataSegment();
+    if(current_process != 0)
+    {
+        current_process->status = PROCESS_WAITING;
+        current_process->waiter = &process_queue[new_process_entry];
+    }
+    restoreDataSegment();
 }
 
 struct process_found* handleTimerInterrupt(int sp)
 {
     counter += 1;
-    current_process->sp = sp;
+    if(current_process != 0) current_process->sp = sp;
     /*printString("Tic\0");*/
 
     if(counter == 1000)
@@ -135,11 +188,13 @@ struct process_found* handleTimerInterrupt(int sp)
     }
 
     schedule_process();
+    /*printString("Salio\0");*/
 
     process.process_available = 1;
     process.sp = current_process->sp;
     process.segment = current_process->segment;
 
+    
     return &process;
 }
 
@@ -155,12 +210,15 @@ int schedule_process()
             continue;
         }
 
+        if(current_process != 0 && current_process->status == PROCESS_RUNNING) current_process->status = PROCESS_READY;
+        /*printChar(i_current_process + 48);*/
+
         if(process_queue[i].status != PROCESS_READY) continue;
 
-        current_process->status = PROCESS_READY;
         process_queue[i].status = PROCESS_RUNNING;
         current_process = &process_queue[i];
         i_current_process = i;
+        /*printChar(i_current_process + 48);*/
 
         return 1;
     }
@@ -213,6 +271,13 @@ void handleInterrupt21 (int ax, int bx, int cx, int dx)
 
         case 11:
             return get_size_as_sectors(bx);
+
+        case 12:
+            kill_process(bx);
+            break;
+
+        case 13:
+            execute_w(bx);
     }
 }
 
@@ -308,10 +373,10 @@ int executeProgram(char* name)
 
         if(free_segment != 1) continue;
 
-        process_queue[i].status = PROCESS_READY;
+        /*printChar(i + 48);*/
+        /*process_queue[i].status = PROCESS_READY;*/
         running_process = process_queue[i];
-        current_process = &process_queue[i];
-        i_current_process = i;
+        new_process_entry = i;
         
         break;
     }
@@ -320,11 +385,12 @@ int executeProgram(char* name)
 
     if(free_segment == 0) return;
 
-    copyToSegment(buffer, running_process.segment);
+    copyToSegment(buffer, running_process.segment, 0, 13312);
     initialize_program(running_process.segment);
-    
-    if(process_queue[0].status == 1)
-        /*launchProgram(buffer, running_process.segment);*/
+
+    setKernelDataSegment();
+    process_queue[new_process_entry].status = PROCESS_READY;
+    restoreDataSegment();
     
     return 1;
 }
@@ -433,6 +499,8 @@ int readFile(char* file, char* buffer)
     int entry;
     int i_sector;
 
+    int c = 1;
+
     readSector(directory, 2);
 
     entry = search_directory_entry(directory, file);
@@ -447,6 +515,7 @@ int readFile(char* file, char* buffer)
         }
 
         readSector(buffer, directory[i_sector + entry]);
+        /*printChar(buffer[3] + 48);*/
         buffer += SECTOR_SIZE;
     }
 

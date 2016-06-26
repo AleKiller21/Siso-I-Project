@@ -1,5 +1,5 @@
 
-#define COMMANDS 			9
+#define COMMANDS 			11
 #define FILE_NAME_SIZE 		6
 #define COMMAND_LENGTH 		7
 #define OS_NAME_LENGTH		7
@@ -22,6 +22,8 @@ void version(int letter_offset, char* input);
 void delete(int letter_offset, char* input);
 void copy(int letter_offset, char* input);
 void open_spell(int letter_offset, char* input);
+void kill_process(int letter_offset, char* input);
+void execute_blocking(int letter_offset, char* input);
 
 int cursor_y;
 char commands[COMMANDS][COMMAND_LENGTH];
@@ -107,37 +109,46 @@ void run_command(char* input, int cmd_sel, int letter_offset)
 			break;
 
 		case 2:
-			exec_program(letter_offset, input);
+			execute_blocking(letter_offset, input);
 			break;
 
 		case 3:
-			list_files(letter_offset, input);
+			exec_program(letter_offset, input);
 			break;
 
 		case 4:
-			help(letter_offset, input, commands);
+			list_files(letter_offset, input);
 			break;
 
 		case 5:
-			version(letter_offset, input);
+			help(letter_offset, input, commands);
 			break;
 
 		case 6:
-			delete(letter_offset, input);
+			version(letter_offset, input);
 			break;
 
 		case 7:
-			copy(letter_offset, input);
+			delete(letter_offset, input);
 			break;
 
 		case 8:
+			copy(letter_offset, input);
+			break;
+
+		case 9:
 			open_spell(letter_offset, input);
+			break;
+
+		case 10:
+			kill_process(letter_offset, input);
+			break;
 	}
 }
 
 void set_valid_commands(char** commands)
 {
-	commands[0] = "clear\0";
+	/*commands[0] = "clear\0";
 	commands[1] = "type\0";
 	commands[2] = "exec\0";
 	commands[3] = "ls\0";
@@ -146,6 +157,20 @@ void set_valid_commands(char** commands)
 	commands[6] = "delete\0";
 	commands[7] = "copy\0";
 	commands[8] = "spell\0";
+	commands[9] = "kill\0";
+	commands[10] = "execw\0";*/
+
+	commands[0] = "clear\0";
+	commands[1] = "type\0";
+	commands[2] = "execw\0";
+	commands[3] = "exec\0";
+	commands[4] = "ls\0";
+	commands[5] = "help\0";
+	commands[6] = "fairy -v\0";
+	commands[7] = "delete\0";
+	commands[8] = "copy\0";
+	commands[9] = "spell\0";
+	commands[10] = "kill\0";
 }
 
 void clear_screen(int letter_offset, char* input)
@@ -338,6 +363,39 @@ void open_spell(int letter_offset, char* input)
 	}
 
 	if(syscall_executeProgram("spell\0") == -1)
+	{
+		syscall_printString("Program not found!");
+	}
+}
+
+void kill_process(int letter_offset, char* input)
+{
+	int process_id;
+	letter_offset += 1;
+
+	process_id = input[letter_offset] - 48;
+
+	if(validate_file_name(input, letter_offset) == 1) return;
+
+	if(process_id <= 0 || process_id >= 9)
+	{
+		syscall_printString(" No such process with that id exists!\0");
+
+		return;
+	}
+
+	syscall_kill_process(process_id);
+}
+
+void execute_blocking(int letter_offset, char* input)
+{
+	letter_offset += 1;
+	cursor_y += 2;
+
+	if(validate_file_name(input, letter_offset) == 1) return;
+
+	syscall_setCursorPosition(cursor_y, 0);
+	if(syscall_execute_blocking(input + letter_offset) == -1)
 	{
 		syscall_printString("Program not found!");
 	}

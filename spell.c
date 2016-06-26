@@ -21,6 +21,8 @@ main()
 	show_title();
 	clear_buffer(buffer, PROGRAM_SIZE);
 	create_text_file();
+	syscall_clearScreen();
+	syscall_setCursorPosition(1, 0);
 	syscall_terminate();
 }
 
