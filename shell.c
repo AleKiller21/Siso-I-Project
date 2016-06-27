@@ -1,5 +1,5 @@
 
-#define COMMANDS 			11
+#define COMMANDS 			12
 #define FILE_NAME_SIZE 		6
 #define COMMAND_LENGTH 		7
 #define OS_NAME_LENGTH		7
@@ -24,6 +24,7 @@ void copy(int letter_offset, char* input);
 void open_spell(int letter_offset, char* input);
 void kill_process(int letter_offset, char* input);
 void execute_blocking(int letter_offset, char* input);
+void list_process(int letter_offset, char* input);
 
 int cursor_y;
 char commands[COMMANDS][COMMAND_LENGTH];
@@ -143,6 +144,9 @@ void run_command(char* input, int cmd_sel, int letter_offset)
 		case 10:
 			kill_process(letter_offset, input);
 			break;
+
+		case 11:
+			list_process(letter_offset, input);
 	}
 }
 
@@ -171,6 +175,7 @@ void set_valid_commands(char** commands)
 	commands[8] = "copy\0";
 	commands[9] = "spell\0";
 	commands[10] = "kill\0";
+	commands[11] = "ps\0";
 }
 
 void clear_screen(int letter_offset, char* input)
@@ -399,5 +404,28 @@ void execute_blocking(int letter_offset, char* input)
 	{
 		syscall_printString("Program not found!");
 	}
+}
+
+void list_process(int letter_offset, char* input)
+{
+	int processes[8][3];
+	int nums[1];
+	int total;
+	int i;
+	int x;
+
+	if(validate_command(input, letter_offset) == 1) return;
+
+	for(i = 0; i < 8; i += 1)
+	{
+		clear_digits_buffer(processes[i], 3);
+	}
+
+	total = 0;
+	cursor_y += 1;
+	/*syscall_setCursorPosition(cursor_y, 0);*/
+	syscall_printString("Procesos: \r\n\0");
+	/*syscall_setCursorPosition(cursor_y + 1, 0);*/
+	syscall_list_process(processes, cursor_y + 1);
 }
 

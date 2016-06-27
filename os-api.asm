@@ -13,6 +13,7 @@
 .global _syscall_get_size_as_sectors
 .global _syscall_kill_process
 .global _syscall_execute_blocking
+.global _syscall_list_process
 .global _enableInterrupts
 
 ;void printString(char *buffer);
@@ -175,7 +176,20 @@ _syscall_execute_blocking:
 	pop bp
 	ret
 
+;void list_process(int** processes, int* total_process)
+_syscall_list_process:
+	push bp
+	mov bp, sp
+	mov dx, #0
+	mov cx, [bp+6]
+	mov bx, [bp+4]
+	mov ax, #14
+	int #0x21
+	pop bp
+	ret
+
 _enableInterrupts:
 	sti
 	ret
+
 

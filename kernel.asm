@@ -331,6 +331,7 @@ _timerISR:
 	;mov ax, sp
 	;call _printhex
 
+	sti
 	iret
 
 ; void setTimerPhase(int hz) 

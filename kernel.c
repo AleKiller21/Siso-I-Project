@@ -15,6 +15,11 @@ void terminate_process();
 void kill_process(int process_id);
 void activate_waiting_process();
 void execute_w(char* name);
+void list_process(int** processes, int* total_process);
+int modulo(int numerator, int denominator);
+void get_digits(int sectors, int* digits);
+void print_numbers(int* digits, int size_array);
+
 int schedule_process();
 
 struct process_found* handleTimerInterrupt(int sp);
@@ -176,7 +181,73 @@ void execute_w(char* name)
     restoreDataSegment();
 }
 
-struct process_found* handleTimerInterrupt(int sp)
+void list_process(int** processes, int row)
+{
+    int i;
+    int x;
+
+    setKernelDataSegment();
+    for(i = 0; i < PROCESS_ENTRIES; i += 1)
+    {
+        int digits[5];
+
+        for(x = 0; x < 5; x += 1)
+            digits[x] = 0;
+
+        get_digits(process_queue[i].segment, digits);
+        printString("\r\nProceso - \0");
+        printChar(i + 48);
+        printString(" State - \0");
+        printChar(process_queue[i].status + 48);
+        printString(" Segment - \0");
+        print_numbers(digits, 5);
+    }
+
+    restoreDataSegment();
+}
+
+void get_digits(int sectors, int* digits)
+{
+    int i;
+    int size;
+
+    size = sectors;
+
+    for(i = 4; i >= 0; i -= 1)
+    {
+        digits[i] = modulo(size, 10);
+        size /= 10;
+    }
+}
+
+int modulo(int numerator, int denominator)
+{
+    int residuo = numerator;
+
+    while(residuo - denominator >= 0)
+    {
+        residuo -= denominator;
+    }
+
+    return residuo;
+}
+
+void print_numbers(int* digits, int size_array)
+{
+    char num[2];
+    int i_digits;
+
+    num[1] = '\0';
+
+    for(i_digits = 0; i_digits < size_array; i_digits += 1)
+    {           
+        num[0] = (char)digits[i_digits];
+        num[0] += 48;
+        printString(num);
+    }
+}
+
+struct process_found* handleTimerInterrupt(unsigned int sp)
 {
     counter += 1;
     if(current_process != 0) current_process->sp = sp;
@@ -278,6 +349,10 @@ void handleInterrupt21 (int ax, int bx, int cx, int dx)
 
         case 13:
             execute_w(bx);
+            break;
+
+        case 14:
+            list_process(bx, cx);
     }
 }
 
@@ -515,7 +590,6 @@ int readFile(char* file, char* buffer)
         }
 
         readSector(buffer, directory[i_sector + entry]);
-        /*printChar(buffer[3] + 48);*/
         buffer += SECTOR_SIZE;
     }
 
